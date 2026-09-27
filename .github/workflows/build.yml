@@ -1,0 +1,63 @@
+name: Build APK
+
+# Runs automatically on every push/PR that touches the app, and can also be
+# triggered manually from the Actions tab ("Run workflow" button).
+on:
+  push:
+    branches: [ "**" ]
+    paths:
+      - "app/**"
+      - "original/**"
+      - "patch/**"
+      - "build_apk.sh"
+      - ".github/workflows/build.yml"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      # apktool.jar / uber-apk-signer.jar / android.jar / dx.jar rarely change,
+      # so cache them to make repeat builds fast.
+      - name: Cache build tools
+        uses: actions/cache@v4
+        with:
+          path: .tools
+          key: tvremote-tools-v1
+
+      - name: Make build script executable
+        run: chmod +x build_apk.sh
+
+      - name: Build APK
+        run: ./build_apk.sh
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote_r_googletv-apk
+          path: dist/remote_r_googletv.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # Optional: when you push a tag like v1.0, also attach the APK to a
+      # GitHub Release automatically. Remove this block if you don't want it.
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/remote_r_googletv.apk
